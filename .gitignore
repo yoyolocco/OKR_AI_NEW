@@ -1,0 +1,14 @@
+﻿node_modules/
+.env
+.env.local
+dist/
+build/
+*.log
+.DS_Store
+.vscode/
+coverage/
+.nyc_output/
+*.sqlite
+*.db
+.cache/
+temp/
