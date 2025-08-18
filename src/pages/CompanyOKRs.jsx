@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MessageCircle, Save, Edit, Trash2, ChevronDown, ChevronUp, Building2, Link as LinkIcon, Brain } from 'lucide-react';
+import { Plus, MessageCircle, Save, Edit, Trash2, ChevronDown, ChevronUp, Building2, Link as LinkIcon, Brain, Target, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -215,7 +215,7 @@ const CompanyOKRs = () => {
             return (
               <motion.div key={objective.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="glassmorphism rounded-xl p-6">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 cursor-pointer" onClick={() => toggleObjectiveExpansion(objective.id)}>
                         <div className="w-8 h-8 bg-brand-cyan rounded-full flex items-center justify-center text-brand-dark font-bold">{index + 1}</div>
                         <h3 className="text-xl font-bold text-white">{objective.title}</h3>
                         <span className="text-2xl font-bold text-brand-cyan">{objective.progress}%</span>
@@ -242,19 +242,22 @@ const CompanyOKRs = () => {
                 
                 {expandedObjectives.includes(objective.id) && (
                     <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="space-y-4 mt-4 pl-10 border-l-2 border-brand-cyan/20">
-                        {linkedDepartments.length > 0 ? linkedDepartments.map(dept => (
-                            <div key={dept.id} className="space-y-2">
-                                <h4 className="font-bold text-brand-cyan-light flex items-center"><Building2 className="w-4 h-4 mr-2"/>{dept.name}</h4>
-                                {dept.linkedObjectives.map(deptObj => (
-                                    <div key={deptObj.id} className="p-3 bg-slate-800/50 rounded-md ml-4">
-                                        <div className="flex justify-between items-center">
-                                            <p className="text-white">{deptObj.title}</p>
-                                            <span className="font-semibold text-brand-cyan-light">{deptObj.progress}%</span>
+                        {linkedDepartments.length > 0 ? linkedDepartments.map(dept => {
+                            const allKRs = dept.linkedObjectives.flatMap(obj => obj.krs || []);
+                            return (
+                                <div key={dept.id} className="space-y-2">
+                                    <h4 className="font-bold text-brand-cyan-light flex items-center"><Building2 className="w-4 h-4 mr-2"/>{dept.name}</h4>
+                                    {allKRs.length > 0 ? allKRs.map((kr, index) => (
+                                        <div key={`${dept.id}-${kr.id}-${index}`} className="p-3 bg-slate-800/50 rounded-md ml-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-white">{kr.title}</p>
+                                                <span className="font-semibold text-brand-cyan-light">{kr.progress || 0}%</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )) : <p className="text-gray-400 text-center py-4">Bu şirket hedefine bağlı departman hedefi bulunmuyor.</p>}
+                                    )) : <p className="text-gray-400 ml-4">Bu departmanın bağlı KR'ı bulunmuyor.</p>}
+                                </div>
+                            );
+                        }) : <p className="text-gray-400 text-center py-4">Bu şirket hedefine bağlı departman hedefi bulunmuyor.</p>}
                     </motion.div>
                 )}
               </motion.div>
@@ -274,3 +277,4 @@ const CompanyOKRs = () => {
 };
 
 export default CompanyOKRs;
+

@@ -19,6 +19,41 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const CheckInRow = ({ deptId, objId, kr, period, handleSaveCheckIn, handleCheckInValueChange, checkInValues }) => {
+    const checkIn = kr.checkIns?.find(ci => ci.period === period);
+    const currentValues = checkInValues[kr.id]?.[period] || {};
+
+    useEffect(() => {
+        if (checkIn) {
+            handleCheckInValueChange(kr.id, period, 'target', checkIn.target);
+            handleCheckInValueChange(kr.id, period, 'actual', checkIn.actual);
+        }
+    }, [checkIn, kr.id, period]);
+
+    return (
+        <div key={period} className="grid grid-cols-4 gap-2 items-center text-sm">
+            <div className="font-medium text-white">{period}</div>
+            <Input 
+                type="number" 
+                value={currentValues.target || ''} 
+                onChange={e => handleCheckInValueChange(kr.id, period, 'target', e.target.value)}
+                placeholder="Hedef"
+                className="bg-slate-700"
+            />
+            <Input 
+                type="number" 
+                value={currentValues.actual || ''} 
+                onChange={e => handleCheckInValueChange(kr.id, period, 'actual', e.target.value)}
+                placeholder="Gerçekleşen"
+                className="bg-slate-700"
+            />
+            <Button size="sm" onClick={() => handleSaveCheckIn(deptId, objId, kr.id, period)} className="w-full">
+                <Save className="w-3 h-3 mr-1"/> Kaydet
+            </Button>
+        </div>
+    );
+};
+
 const CheckIn = () => {
   const { toast } = useToast();
   const { data, setData } = useContext(AppContext);
@@ -109,49 +144,6 @@ const CheckIn = () => {
     toast({ title: 'Check-in Kaydedildi!', description: `"${period}" dönemi için ilerleme güncellendi.` });
   };
 
-  const renderCheckInRow = (deptId, objId, kr, period) => {
-    const checkIn = kr.checkIns?.find(ci => ci.period === period);
-    const currentValues = checkInValues[kr.id]?.[period] || {};
-
-    useEffect(() => {
-        if (checkIn) {
-            setCheckInValues(prev => ({
-                ...prev,
-                [kr.id]: {
-                    ...prev[kr.id],
-                    [period]: {
-                        target: checkIn.target,
-                        actual: checkIn.actual
-                    }
-                }
-            }));
-        }
-    }, [checkIn, kr.id, period]);
-
-    return (
-        <div key={period} className="grid grid-cols-4 gap-2 items-center text-sm">
-            <div className="font-medium text-white">{period}</div>
-            <Input 
-                type="number" 
-                value={currentValues.target || ''} 
-                onChange={e => handleCheckInValueChange(kr.id, period, 'target', e.target.value)}
-                placeholder="Hedef"
-                className="bg-slate-700"
-            />
-            <Input 
-                type="number" 
-                value={currentValues.actual || ''} 
-                onChange={e => handleCheckInValueChange(kr.id, period, 'actual', e.target.value)}
-                placeholder="Gerçekleşen"
-                className="bg-slate-700"
-            />
-            <Button size="sm" onClick={() => handleSaveCheckIn(deptId, objId, kr.id, period)} className="w-full">
-                <Save className="w-3 h-3 mr-1"/> Kaydet
-            </Button>
-        </div>
-    );
-  };
-
   const selectedDepartment = data.departments.find(d => d.id === selectedDeptId);
 
   return (
@@ -212,7 +204,18 @@ const CheckIn = () => {
                                                 <div>Gerçekleşen</div>
                                                 <div></div>
                                             </div>
-                                            {periods.map(period => renderCheckInRow(selectedDeptId, obj.id, kr, period))}
+                                            {periods.map(period => 
+                                                <CheckInRow
+                                                    key={period}
+                                                    deptId={selectedDeptId}
+                                                    objId={obj.id}
+                                                    kr={kr}
+                                                    period={period}
+                                                    handleSaveCheckIn={handleSaveCheckIn}
+                                                    handleCheckInValueChange={handleCheckInValueChange}
+                                                    checkInValues={checkInValues}
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 ))}

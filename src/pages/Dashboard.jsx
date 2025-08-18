@@ -31,9 +31,11 @@ const Dashboard = () => {
 
   // Calculate current quarter/month for Hourglass
   const now = new Date();
-  const currentMonth = now.getMonth() + 1; // 0-indexed
-  const currentQuarter = Math.ceil(currentMonth / 3);
-  const currentPeriod = `${now.getFullYear()}Q${currentQuarter}`;
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const endOfYear = new Date(now.getFullYear(), 11, 31);
+  const totalDaysInYear = (endOfYear - startOfYear) / (1000 * 60 * 60 * 24);
+  const daysPassed = (now - startOfYear) / (1000 * 60 * 60 * 24);
+  const yearProgress = (daysPassed / totalDaysInYear) * 100;
 
   return (
     <div className="space-y-6">
@@ -46,6 +48,13 @@ const Dashboard = () => {
                 animate={{ width: `${overallCompanyProgress}%` }}
                 transition={{ duration: 1.5, ease: "easeInOut" }}
             />
+            <div 
+                className="absolute -top-5 w-12 h-12 flex items-center justify-center"
+                style={{ left: `calc(${yearProgress}% - 1.5rem)` }}
+                title={`Bugün: ${now.toLocaleDateString()}`}
+            >
+                <Hourglass className="w-8 h-8 text-white"/>
+            </div>
             <motion.div 
                 className="absolute -top-5 w-12 h-12 flex items-center justify-center"
                 initial={{ left: '0%' }}
@@ -54,10 +63,6 @@ const Dashboard = () => {
             >
                 <Rocket className="w-8 h-8 text-white transform -rotate-45"/>
             </motion.div>
-             <div className="absolute -top-4 -right-10 flex items-center space-x-2 text-white">
-                <Hourglass className="w-5 h-5"/>
-                <span>{currentPeriod}</span>
-            </div>
         </div>
         <div className="mt-12 text-center">
           <span className="text-4xl font-bold text-brand-cyan">{overallCompanyProgress}%</span>

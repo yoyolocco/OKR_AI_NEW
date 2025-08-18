@@ -13,24 +13,86 @@ const initialData = {
 };
 
 // --- Progress Calculation Logic ---
-const calculateKrProgress = (kr) => {
-  if (!kr.checkIns || kr.checkIns.length === 0) return 0;
-  const lastCheckIn = kr.checkIns[kr.checkIns.length - 1];
-  const target = parseFloat(lastCheckIn.target);
-  const actual = parseFloat(lastCheckIn.actual);
+const calculateKrProgress = (kr, activeQuarters) => {
+  console.log("Calculating progress for KR:", kr.title, "Type:", kr.type, "Start Value:", kr.startValue, "Active Quarters:", activeQuarters);
+  if (!kr.checkIns || kr.checkIns.length === 0) {
+    console.log("No check-ins found for KR.");
+    return 0;
+  }
+
+  let relevantCheckIns = [];
+
+  if (activeQuarters.includes('Tümü')) {
+    relevantCheckIns = kr.checkIns;
+  } else {
+    const allPeriods = new Set();
+    activeQuarters.forEach(aq => {
+        allPeriods.add(aq);
+        const year = aq.substring(0, 4);
+        const quarter = aq.substring(5, 6);
+        const months = [];
+        if (quarter === '1') { months.push(`${year}01`, `${year}02`, `${year}03`); }
+        if (quarter === '2') { months.push(`${year}04`, `${year}05`, `${year}06`); }
+        if (quarter === '3') { months.push(`${year}07`, `${year}08`, `${year}09`); }
+        if (quarter === '4') { months.push(`${year}10`, `${year}11`, `${year}12`); }
+        months.forEach(m => allPeriods.add(m));
+    });
+    relevantCheckIns = kr.checkIns.filter(ci => allPeriods.has(ci.period));
+  }
+
+  let checkInToUse = null;
+  if (relevantCheckIns.length > 0) {
+    // Sort by period to get the latest one
+    relevantCheckIns.sort((a, b) => b.period.localeCompare(a.period));
+    for (let i = 0; i < relevantCheckIns.length; i++) {
+      const ci = relevantCheckIns[i];
+      if (parseFloat(ci.actual) !== 0 || parseFloat(ci.target) !== 0) {
+        checkInToUse = ci;
+        break;
+      }
+    }
+  }
+
+  if (!checkInToUse) {
+    console.log("No meaningful check-in found for the criteria.");
+    return 0;
+  }
+
+  const target = parseFloat(checkInToUse.target);
+  const actual = parseFloat(checkInToUse.actual);
   const startValue = parseFloat(kr.startValue) || 0;
 
-  if (isNaN(target) || isNaN(actual)) return 0;
+  console.log("Using check-in:", checkInToUse, "Target:", target, "Actual:", actual, "Start Value:", startValue);
 
-  if (kr.type === 'azalan') {
-    if (target >= startValue) return 100;
-    const progress = ((startValue - actual) / (startValue - target)) * 100;
-    return Math.max(0, Math.min(progress, 100));
-  } else {
-    if (target === 0) return actual > 0 ? 100 : 0;
-    const progress = (actual / target) * 100;
-    return Math.max(0, Math.min(progress, 100));
+  if (isNaN(target) || isNaN(actual)) {
+    console.warn("Target or Actual is NaN.");
+    return 0;
   }
+
+  let progress = 0;
+  if (kr.type === 'azalan') {
+    if (startValue === target) {
+      progress = actual <= target ? 100 : 0;
+    } else {
+      progress = ((startValue - actual) / (startValue - target)) * 100;
+    }
+  } else if (kr.type === 'artan') {
+    if (startValue === target) {
+      progress = actual >= target ? 100 : 0;
+    } else {
+      progress = ((actual - startValue) / (target - startValue)) * 100;
+    }
+  } else { // dalgalı veya diğer tipler
+    if (target === 0) {
+      progress = actual > 0 ? 100 : 0;
+    } else {
+      progress = (actual / target) * 100;
+    }
+  }
+
+  progress = Math.round(Math.max(0, Math.min(progress, 100)));
+  console.log("Calculated progress:", progress);
+  return progress;
 };
 
 const calculateObjectiveProgress = (objective) => {
@@ -42,14 +104,14 @@ const calculateObjectiveProgress = (objective) => {
   return Math.round(weightedProgress / totalWeight);
 };
 
-const calculateOverallProgress = (data) => {
+const calculateOverallProgress = (data, activeQuarter) => {
     const newData = JSON.parse(JSON.stringify(data));
 
     // 1. Calculate KR and then Department Objective progress
     newData.departments.forEach(dept => {
         (dept.objectives || []).forEach(obj => {
             (obj.krs || []).forEach(kr => {
-                kr.progress = calculateKrProgress(kr);
+                kr.progress = calculateKrProgress(kr, activeQuarter);
             });
             obj.progress = calculateObjectiveProgress(obj);
         });
@@ -69,8 +131,13 @@ const calculateOverallProgress = (data) => {
         if (linkedDeptObjectives.length > 0) {
             const totalProgress = linkedDeptObjectives.reduce((sum, deptObj) => sum + deptObj.progress, 0);
             compObj.progress = Math.round(totalProgress / linkedDeptObjectives.length);
+        } else if (compObj.krs && compObj.krs.length > 0) {
+            (compObj.krs || []).forEach(kr => {
+                kr.progress = calculateKrProgress(kr, activeQuarter);
+            });
+            compObj.progress = calculateObjectiveProgress(compObj);
         } else {
-            compObj.progress = 0; // Or calculate based on its own KRs if any
+            compObj.progress = 0;
         }
     });
     
@@ -94,12 +161,18 @@ export const AppContextProvider = ({ children }) => {
   const [versions, setVersions] = useState([]);
   const [activeVersion, setActiveVersion] = useState('latest');
   const [viewMode, setViewMode] = useState('Yönetici');
-  const [activeQuarter, setActiveQuarter] = useState('Tümü');
+  const [activeQuarter, setActiveQuarter] = useState(['Tümü']);
   const [loading, setLoading] = useState(true);
+  const [processedData, setProcessedData] = useState(initialData);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("fetchData: User not logged in, skipping data fetch.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    console.log("fetchData: Attempting to fetch data for user:", user.id);
     
     const { data: okrData, error: okrError } = await supabase
       .from('okr_data')
@@ -109,15 +182,17 @@ export const AppContextProvider = ({ children }) => {
       .limit(1);
 
     if (okrError) {
+      console.error("fetchData: Error fetching OKR data from Supabase:", okrError);
       toast({ variant: "destructive", title: "Veri alınamadı", description: okrError.message });
     } else if (okrData && okrData.length > 0) {
-      const calculatedData = calculateOverallProgress({
+      console.log("fetchData: OKR data fetched successfully:", okrData[0]);
+      setData({
         objectives: okrData[0].objectives || [],
         departments: okrData[0].departments || [],
         orgChart: okrData[0].org_chart || initialData.orgChart,
       });
-      setData(calculatedData);
     } else {
+      console.log("fetchData: No OKR data found for user, initializing with empty data.");
       setData(initialData);
     }
 
@@ -128,26 +203,40 @@ export const AppContextProvider = ({ children }) => {
       .order('created_at', { ascending: false });
 
     if (versionError) {
+      console.error("fetchData: Error fetching versions from Supabase:", versionError);
       toast({ variant: "destructive", title: "Versiyonlar alınamadı", description: versionError.message });
     } else {
+      console.log("fetchData: Versions fetched successfully:", versionData);
       setVersions(versionData || []);
     }
     
     setLoading(false);
+    console.log("fetchData: Data fetch process completed.");
   }, [user, toast]);
 
   useEffect(() => {
+    console.log("fetchData useEffect triggered");
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const calculatedData = calculateOverallProgress(data, activeQuarter);
+    setProcessedData(calculatedData);
+  }, [data, activeQuarter]);
+
   const updateSupabaseData = useCallback(async (newData) => {
-    if (!user) return;
+    if (!user) {
+      console.log("updateSupabaseData: User not logged in, skipping data update.");
+      return;
+    }
+    console.log("updateSupabaseData: Attempting to update data for user:", user.id, "with data:", newData);
     const { data: existingData, error: fetchError } = await supabase
       .from('okr_data')
       .select('id')
       .eq('user_id', user.id);
 
     if (fetchError) {
+      console.error("updateSupabaseData: Error fetching existing data from Supabase:", fetchError);
       toast({ variant: "destructive", title: "Veri güncellenemedi", description: fetchError.message });
       return;
     }
@@ -162,12 +251,14 @@ export const AppContextProvider = ({ children }) => {
 
     let error;
     if (existingData && existingData.length > 0) {
+      console.log("updateSupabaseData: Existing data found, attempting to update record with ID:", existingData[0].id);
       const { error: updateError } = await supabase
         .from('okr_data')
         .update(updatePayload)
         .eq('id', existingData[0].id);
       error = updateError;
     } else {
+      console.log("updateSupabaseData: No existing data found, attempting to insert new record.");
       const { error: insertError } = await supabase
         .from('okr_data')
         .insert(updatePayload);
@@ -175,17 +266,18 @@ export const AppContextProvider = ({ children }) => {
     }
 
     if (error) {
+      console.error("updateSupabaseData: Error saving data to Supabase:", error);
       toast({ variant: "destructive", title: "Veri kaydedilemedi", description: error.message });
+    } else {
+      console.log("updateSupabaseData: Data saved successfully to Supabase.");
+      toast({ title: "Veriler kaydedildi!", description: "Değişiklikleriniz otomatik olarak kaydedildi." });
     }
   }, [user, toast]);
 
   const handleSetData = (newData) => {
     const updatedData = typeof newData === 'function' ? newData(data) : newData;
-    const calculatedData = calculateOverallProgress(updatedData);
-    setData(calculatedData);
-    if (activeVersion === 'latest') {
-      updateSupabaseData(calculatedData);
-    }
+    setData(updatedData);
+    updateSupabaseData(updatedData);
   };
 
   const saveVersion = async (name) => {
@@ -194,9 +286,9 @@ export const AppContextProvider = ({ children }) => {
       user_id: user.id,
       name,
       data: {
-        objectives: data.objectives,
-        departments: data.departments,
-        orgChart: data.orgChart,
+        objectives: processedData.objectives,
+        departments: processedData.departments,
+        orgChart: processedData.orgChart,
       }
     };
     const { data: insertedVersion, error } = await supabase
@@ -309,15 +401,22 @@ export const AppContextProvider = ({ children }) => {
   };
 
   const importDataFromXLSX = (parsedData, mode) => {
-    const newObjectives = JSON.parse(JSON.stringify(data.objectives));
-    const newDepartments = JSON.parse(JSON.stringify(data.departments));
+    let newObjectives = JSON.parse(JSON.stringify(data.objectives));
+    let newDepartments = JSON.parse(JSON.stringify(data.departments));
 
-    parsedData.forEach(row => {
+    if (mode === 'overwrite') {
+      newObjectives = [];
+      newDepartments = [];
+    }
+
+    const companyRows = parsedData.filter(row => row['Hedef Tipi'] === 'Şirket');
+    const departmentRows = parsedData.filter(row => row['Hedef Tipi'] === 'Departman');
+
+    // Process Company Objectives first
+    companyRows.forEach(row => {
         const krData = {};
         const checkIns = [];
-        let krId = null;
 
-        // Extract base KR data
         krData.title = row['KR Açıklaması'];
         krData.responsible = row['Sorumlu'];
         krData.type = row['KR Tipi'];
@@ -325,7 +424,6 @@ export const AppContextProvider = ({ children }) => {
         krData.startValue = parseFloat(row['Başlangıç Değeri']);
         krData.action = row['Aksiyon'];
 
-        // Extract check-ins dynamically
         for (const key in row) {
             if (key.startsWith('Hedef_')) {
                 const period = key.replace('Hedef_', '');
@@ -336,52 +434,73 @@ export const AppContextProvider = ({ children }) => {
                 }
             }
         }
-        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period)); // Sort check-ins by period
+        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
+        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
 
-        // Find or create KR and link to Objective/Department Objective
-        if (row['Hedef Tipi'] === 'Şirket') {
-            let compObj = newObjectives.find(o => o.title === row['Şirket Hedefi']);
-            if (!compObj) {
-                compObj = { id: Date.now() + Math.random(), title: row['Şirket Hedefi'], krs: [], progress: 0 };
-                newObjectives.push(compObj);
-            }
-            const existingKr = compObj.krs.find(k => k.title === krData.title && k.responsible === krData.responsible);
-            if (existingKr) {
-                Object.assign(existingKr, { ...krData, id: existingKr.id });
-            } else {
-                compObj.krs.push({ ...krData, id: Date.now() + Math.random() });
-            }
-        } else if (row['Hedef Tipi'] === 'Departman') {
-            let dept = newDepartments.find(d => d.name === row['Departman Adı']);
-            if (!dept) {
-                dept = { id: Date.now() + Math.random(), name: row['Departman Adı'], objectives: [], progress: 0 };
-                newDepartments.push(dept);
-            }
-            let deptObj = dept.objectives.find(o => o.title === row['Departman Hedefi']);
-            if (!deptObj) {
-                deptObj = { id: Date.now() + Math.random(), title: row['Departman Hedefi'], krs: [], progress: 0, companyObjectiveId: data.objectives.find(co => co.title === row['Şirket Hedefi'])?.id };
-                dept.objectives.push(deptObj);
-            }
-            const existingKr = deptObj.krs.find(k => k.title === krData.title && k.responsible === krData.responsible);
-            if (existingKr) {
-                Object.assign(existingKr, { ...krData, id: existingKr.id });
-            } else {
-                deptObj.krs.push({ ...krData, id: Date.now() + Math.random() });
-            }
+        let compObj = newObjectives.find(o => o.title === row['Şirket Hedefi']);
+        if (!compObj) {
+            compObj = { id: Date.now() + Math.random(), title: row['Şirket Hedefi'], krs: [], progress: 0 };
+            newObjectives.push(compObj);
+        }
+        const existingKr = compObj.krs.find(k => k.title === krData.title && k.responsible === krData.responsible);
+        if (existingKr) {
+            Object.assign(existingKr, { ...krData, id: existingKr.id });
+        } else {
+            compObj.krs.push({ ...krData, id: Date.now() + Math.random() });
         }
     });
 
-    if (mode === 'overwrite') {
-        setData(calculateOverallProgress({ objectives: newObjectives, departments: newDepartments, orgChart: data.orgChart }));
-        toast({ title: "Başarılı!", description: "Veriler Excel'den başarıyla üzerine yazıldı." });
-    } else { // merge
-        // Merge logic needs to be more sophisticated for deep merging KRs and objectives
-        toast({ title: "Birleştirme özelliği güncelleniyor", description: "Veri birleştirme özelliği henüz bu format için hazır değil." });
-    }
+    // Then process Department Objectives
+    departmentRows.forEach(row => {
+        const krData = {};
+        const checkIns = [];
+
+        krData.title = row['KR Açıklaması'];
+        krData.responsible = row['Sorumlu'];
+        krData.type = row['KR Tipi'];
+        krData.weight = parseFloat(row['Ağırlık']);
+        krData.startValue = parseFloat(row['Başlangıç Değeri']);
+        krData.action = row['Aksiyon'];
+
+        for (const key in row) {
+            if (key.startsWith('Hedef_')) {
+                const period = key.replace('Hedef_', '');
+                const target = parseFloat(row[key]);
+                const actual = parseFloat(row[`Gerçekleşen_${period}`]);
+                if (!isNaN(target) && !isNaN(actual)) {
+                    checkIns.push({ period, target, actual });
+                }
+            }
+        }
+        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
+        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
+
+        let dept = newDepartments.find(d => d.name === row['Departman Adı']);
+        if (!dept) {
+            dept = { id: Date.now() + Math.random(), name: row['Departman Adı'], objectives: [], progress: 0 };
+            newDepartments.push(dept);
+        }
+        let deptObj = dept.objectives.find(o => o.title === row['Departman Hedefi']);
+        if (!deptObj) {
+            // Crucial change: Find companyObjectiveId from the already processed newObjectives
+            const companyObjective = newObjectives.find(co => co.title === row['Şirket Hedefi']);
+            deptObj = { id: Date.now() + Math.random(), title: row['Departman Hedefi'], krs: [], progress: 0, companyObjectiveId: companyObjective ? companyObjective.id : null };
+            dept.objectives.push(deptObj);
+        }
+        const existingKr = deptObj.krs.find(k => k.title === krData.title && k.responsible === krData.responsible);
+        if (existingKr) {
+            Object.assign(existingKr, { ...krData, id: existingKr.id });
+        } else {
+            deptObj.krs.push({ ...krData, id: Date.now() + Math.random() });
+        }
+    });
+
+    setData({ objectives: newObjectives, departments: newDepartments, orgChart: data.orgChart });
+    toast({ title: "Başarılı!", description: "Veriler Excel'den başarıyla içe aktarıldı." });
   };
 
   const value = {
-    data,
+    data: processedData,
     setData: handleSetData,
     versions,
     saveVersion,

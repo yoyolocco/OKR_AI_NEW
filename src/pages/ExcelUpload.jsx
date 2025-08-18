@@ -79,10 +79,30 @@ const ExcelUpload = () => {
   const { getRootProps: getOrgChartRootProps, getInputProps: getOrgChartInputProps, isDragActive: isOrgChartDragActive } = useDropzone({ onDrop: onOrgChartDrop, accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'] }, multiple: false });
 
   const handleDownloadTemplate = () => {
+    const allPeriods = new Set();
+    const currentYear = new Date().getFullYear();
+    for (let year = currentYear; year <= currentYear + 1; year++) {
+        for (let q = 1; q <= 4; q++) {
+            allPeriods.add(`${year}Q${q}`);
+        }
+        for (let m = 1; m <= 12; m++) {
+            allPeriods.add(`${year}${m.toString().padStart(2, '0')}`);
+        }
+    }
+    const sortedPeriods = Array.from(allPeriods).sort();
+
     const templateData = [
-      { "Hedef Tipi": "Şirket", "Departman Adı": "", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "", "KR Açıklaması": "Örnek KR 1", "Sorumlu": "Ali Veli", "KR Tipi": "artan", "Ağırlık": 50, "Başlangıç Değeri": "", "İlerleme (%)": 25, "Aksiyon": "Haftalık toplantı", "Hedef_2025Q1": 100, "Gerçekleşen_2025Q1": 25 },
-      { "Hedef Tipi": "Departman", "Departman Adı": "DF Fit", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "Örnek Departman Hedefi", "KR Açıklaması": "Örnek KR 2", "Sorumlu": "Ayşe Yılmaz", "KR Tipi": "azalan", "Ağırlık": 100, "Başlangıç Değeri": 10, "İlerleme (%)": 0, "Aksiyon": "Rapor hazırlama", "Hedef_2025Q1": 5, "Gerçekleşen_2025Q1": 8 }
+      { "Hedef Tipi": "Şirket", "Departman Adı": "", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "", "KR Açıklaması": "Örnek KR 1", "Sorumlu": "Ali Veli", "KR Tipi": "artan", "Ağırlık": 50, "Başlangıç Değeri": "", "İlerleme (%)": "", "Aksiyon": "Haftalık toplantı" },
+      { "Hedef Tipi": "Departman", "Departman Adı": "DF Fit", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "Örnek Departman Hedefi", "KR Açıklaması": "Örnek KR 2", "Sorumlu": "Ayşe Yılmaz", "KR Tipi": "azalan", "Ağırlık": 100, "Başlangıç Değeri": 10, "İlerleme (%)": "", "Aksiyon": "Rapor hazırlama" }
     ];
+
+    sortedPeriods.forEach(period => {
+        templateData[0][`Hedef_${period}`] = '';
+        templateData[0][`Gerçekleşen_${period}`] = '';
+        templateData[1][`Hedef_${period}`] = '';
+        templateData[1][`Gerçekleşen_${period}`] = '';
+    });
+
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "OKR Şablonu");

@@ -1,26 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, MessageCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { AppContext } from '@/context/AppContext';
+import AnalysisResult from '@/components/AnalysisResult';
 
 const AIAnalysis = () => {
   const [query, setQuery] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: 'Merhaba! Mevcut OKR verilerinizi sorgulayarak anında içgörüler edinin.',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const { data: okrData } = useContext(AppContext);
   const { toast } = useToast();
 
   const handleSendQuery = async () => {
     if (!query.trim()) return;
 
-    // Add user message
     const userMessage = {
       id: Date.now(),
       type: 'user',
@@ -29,50 +25,27 @@ const AIAnalysis = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setQuery(''); // Clear input immediately
+    setQuery('');
 
     try {
-      const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      console.log("Gemini API Key (from .env):", geminiApiKey ? "Yüklendi" : "Yüklenmedi"); // Hata ayıklama için eklendi
-      if (!geminiApiKey) {
-        toast({
-          variant: "destructive",
-          title: "API Anahtarı Eksik",
-          description: "Lütfen .env dosyanıza VITE_GEMINI_API_KEY değerini ekleyin.",
-        });
-        return;
-      }
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
+      const response = await fetch('http://localhost:3001/api/ai/analyze-okrs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: [
-            { role: "user", parts: [{ text: query }] }
-          ],
-        }),
+        body: JSON.stringify({ query, okrData }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error.message || 'Gemini API hatası');
+        throw new Error(errorData.error || 'AI analiz hatası');
       }
 
       const data = await response.json();
-      const aiResponseContent = data.candidates[0].content.parts[0].text;
-
-      const aiResponse = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: aiResponseContent,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiResponse]);
+      setAnalysisResult(data.analysis);
 
     } catch (error) {
-      console.error("AI API Hatası:", error);
+      console.error("AI Analiz Hatası:", error);
       toast({
         variant: "destructive",
         title: "AI Analiz Hatası",
@@ -173,7 +146,7 @@ const AIAnalysis = () => {
         </div>
       </motion.div>
 
-      {/* Analysis Results Placeholder */}
+      {/* Analysis Results */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -181,14 +154,7 @@ const AIAnalysis = () => {
         className="glassmorphism rounded-xl p-6"
       >
         <h2 className="text-xl font-bold text-white mb-4">Analiz Sonuçları</h2>
-        
-        <div className="bg-slate-800/50 rounded-lg p-6 text-center">
-          <Brain className="w-12 h-12 text-brand-cyan mx-auto mb-4" />
-          <p className="text-gray-300 mb-2">Henüz analiz yapılmadı</p>
-          <p className="text-gray-400 text-sm">
-            Yukarıdaki chat alanından bir soru sorarak AI destekli analiz başlatabilirsiniz.
-          </p>
-        </div>
+        <AnalysisResult analysis={analysisResult} />
       </motion.div>
     </div>
   );

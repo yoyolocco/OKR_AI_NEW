@@ -19,7 +19,28 @@ const Header = () => {
   const { viewMode, setViewMode, activeQuarter, setActiveQuarter } = useContext(AppContext);
   const { user, signOut } = useAuth();
 
-  const quarters = ['Tümü', 'Q1', 'Q2', 'Q3', 'Q4'];
+  const currentYear = new Date().getFullYear();
+  const quarters = [
+    { label: 'Tümü', value: 'Tümü' },
+    { label: 'Q1', value: `${currentYear}Q1` },
+    { label: 'Q2', value: `${currentYear}Q2` },
+    { label: 'Q3', value: `${currentYear}Q3` },
+    { label: 'Q4', value: `${currentYear}Q4` },
+  ];
+
+  const handleQuarterClick = (quarterValue, event) => {
+    if (event.ctrlKey) {
+        setActiveQuarter(prev => {
+            if (prev.includes(quarterValue)) {
+                return prev.filter(q => q !== quarterValue);
+            } else {
+                return [...prev, quarterValue];
+            }
+        });
+    } else {
+        setActiveQuarter([quarterValue]);
+    }
+  };
 
   const handleFeatureClick = (feature) => {
     let description = "Bu özellik henüz tam olarak uygulanmadı, ancak yakında gelecek! 🚀";
@@ -47,13 +68,13 @@ const Header = () => {
         <div className="flex space-x-2">
           {quarters.map((quarter) => (
             <button
-              key={quarter}
-              onClick={() => setActiveQuarter(quarter)}
+              key={quarter.value}
+              onClick={(e) => handleQuarterClick(quarter.value, e)}
               className={`quarter-tab px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                quarter === activeQuarter ? 'active' : ''
+                activeQuarter.includes(quarter.value) ? 'active' : ''
               }`}
             >
-              {quarter}
+              {quarter.label}
             </button>
           ))}
         </div>
