@@ -93,7 +93,8 @@ const ExcelUpload = () => {
 
     const templateData = [
       { "Hedef Tipi": "Şirket", "Departman Adı": "", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "", "KR Açıklaması": "Örnek KR 1", "Sorumlu": "Ali Veli", "KR Tipi": "artan", "Ağırlık": 50, "Başlangıç Değeri": "", "İlerleme (%)": "", "Aksiyon": "Haftalık toplantı" },
-      { "Hedef Tipi": "Departman", "Departman Adı": "DF Fit", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "Örnek Departman Hedefi", "KR Açıklaması": "Örnek KR 2", "Sorumlu": "Ayşe Yılmaz", "KR Tipi": "azalan", "Ağırlık": 100, "Başlangıç Değeri": 10, "İlerleme (%)": "", "Aksiyon": "Rapor hazırlama" }
+      { "Hedef Tipi": "Departman", "Departman Adı": "DF Fit", "Şirket Hedefi": "Örnek Şirket Hedefi", "Departman Hedefi": "Örnek Departman Hedefi", "KR Açıklaması": "Örnek KR 2", "Sorumlu": "Ayşe Yılmaz", "KR Tipi": "azalan", "Ağırlık": 100, "Başlangıç Değeri": 10, "İlerleme (%)": "", "Aksiyon": "Rapor hazırlama" },
+      { "Hedef Tipi": "Health Metric", "Departman Adı": "Genel", "Şirket Hedefi": "", "Departman Hedefi": "", "KR Açıklaması": "Örnek Sağlık Metriği", "Sorumlu": "Canan Hanım", "KR Tipi": "artan", "Ağırlık": "", "Başlangıç Değeri": "80", "İlerleme (%)": "", "Aksiyon": "Aylık kontrol" }
     ];
 
     sortedPeriods.forEach(period => {

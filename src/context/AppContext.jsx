@@ -9,6 +9,7 @@ export const AppContext = createContext();
 const initialData = {
   objectives: [],
   departments: [],
+  healthMetrics: [],
   orgChart: {},
 };
 
@@ -151,6 +152,11 @@ const calculateOverallProgress = (data, activeQuarter) => {
         }
     });
 
+    // 4. Calculate Health Metric progress
+    (newData.healthMetrics || []).forEach(metric => {
+        metric.progress = calculateKrProgress(metric, activeQuarter);
+    });
+
     return newData;
 };
 
@@ -189,6 +195,7 @@ export const AppContextProvider = ({ children }) => {
       setData({
         objectives: okrData[0].objectives || [],
         departments: okrData[0].departments || [],
+        healthMetrics: okrData[0].health_metrics || [],
         orgChart: okrData[0].org_chart || initialData.orgChart,
       });
     } else {
@@ -245,6 +252,7 @@ export const AppContextProvider = ({ children }) => {
       user_id: user.id,
       objectives: newData.objectives,
       departments: newData.departments,
+      health_metrics: newData.healthMetrics,
       org_chart: newData.orgChart,
       updated_at: new Date().toISOString(),
     };
@@ -288,6 +296,7 @@ export const AppContextProvider = ({ children }) => {
       data: {
         objectives: processedData.objectives,
         departments: processedData.departments,
+        healthMetrics: processedData.healthMetrics,
         orgChart: processedData.orgChart,
       }
     };
@@ -388,6 +397,29 @@ export const AppContextProvider = ({ children }) => {
         });
     });
 
+    // Process Health Metrics
+    (dataToExport.healthMetrics || []).forEach(metric => {
+        const row = {
+            'Hedef Tipi': 'Health Metric',
+            'Departman Adı': 'Genel',
+            'Şirket Hedefi': '',
+            'Departman Hedefi': '',
+            'KR Açıklaması': metric.title,
+            'Sorumlu': metric.responsible,
+            'KR Tipi': metric.type,
+            'Ağırlık': '',
+            'Başlangıç Değeri': metric.startValue,
+            'İlerleme (%)': metric.progress,
+            'Aksiyon': metric.action,
+        };
+        sortedPeriods.forEach(period => {
+            const checkIn = metric.checkIns?.find(ci => ci.period === period);
+            row[`Hedef_${period}`] = checkIn ? checkIn.target : '';
+            row[`Gerçekleşen_${period}`] = checkIn ? checkIn.actual : '';
+        });
+        allOKRData.push(row);
+    });
+
     if (allOKRData.length === 0) {
         toast({ variant: "destructive", title: "Dışa Aktarılacak Veri Yok", description: "Lütfen önce OKR oluşturun." });
         return;
@@ -403,14 +435,17 @@ export const AppContextProvider = ({ children }) => {
   const importDataFromXLSX = (parsedData, mode) => {
     let newObjectives = JSON.parse(JSON.stringify(data.objectives));
     let newDepartments = JSON.parse(JSON.stringify(data.departments));
+    let newHealthMetrics = JSON.parse(JSON.stringify(data.healthMetrics));
 
     if (mode === 'overwrite') {
       newObjectives = [];
       newDepartments = [];
+      newHealthMetrics = [];
     }
 
     const companyRows = parsedData.filter(row => row['Hedef Tipi'] === 'Şirket');
     const departmentRows = parsedData.filter(row => row['Hedef Tipi'] === 'Departman');
+    const healthMetricRows = parsedData.filter(row => row['Hedef Tipi'] === 'Health Metric');
 
     // Process Company Objectives first
     companyRows.forEach(row => {
@@ -434,7 +469,6 @@ export const AppContextProvider = ({ children }) => {
                 }
             }
         }
-        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
         krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
 
         let compObj = newObjectives.find(o => o.title === row['Şirket Hedefi']);
@@ -473,7 +507,6 @@ export const AppContextProvider = ({ children }) => {
             }
         }
         krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
-        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
 
         let dept = newDepartments.find(d => d.name === row['Departman Adı']);
         if (!dept) {
@@ -482,7 +515,6 @@ export const AppContextProvider = ({ children }) => {
         }
         let deptObj = dept.objectives.find(o => o.title === row['Departman Hedefi']);
         if (!deptObj) {
-            // Crucial change: Find companyObjectiveId from the already processed newObjectives
             const companyObjective = newObjectives.find(co => co.title === row['Şirket Hedefi']);
             deptObj = { id: Date.now() + Math.random(), title: row['Departman Hedefi'], krs: [], progress: 0, companyObjectiveId: companyObjective ? companyObjective.id : null };
             dept.objectives.push(deptObj);
@@ -495,7 +527,38 @@ export const AppContextProvider = ({ children }) => {
         }
     });
 
-    setData({ objectives: newObjectives, departments: newDepartments, orgChart: data.orgChart });
+    // Process Health Metrics
+    healthMetricRows.forEach(row => {
+        const krData = {};
+        const checkIns = [];
+
+        krData.title = row['KR Açıklaması'];
+        krData.responsible = row['Sorumlu'];
+        krData.type = row['KR Tipi'];
+        krData.startValue = parseFloat(row['Başlangıç Değeri']);
+        krData.action = row['Aksiyon'];
+
+        for (const key in row) {
+            if (key.startsWith('Hedef_')) {
+                const period = key.replace('Hedef_', '');
+                const target = parseFloat(row[key]);
+                const actual = parseFloat(row[`Gerçekleşen_${period}`]);
+                if (!isNaN(target) && !isNaN(actual)) {
+                    checkIns.push({ period, target, actual });
+                }
+            }
+        }
+        krData.checkIns = checkIns.sort((a, b) => a.period.localeCompare(b.period));
+
+        const existingMetric = newHealthMetrics.find(m => m.title === krData.title && m.responsible === krData.responsible);
+        if (existingMetric) {
+            Object.assign(existingMetric, { ...krData, id: existingMetric.id });
+        } else {
+            newHealthMetrics.push({ ...krData, id: Date.now() + Math.random() });
+        }
+    });
+
+    setData({ objectives: newObjectives, departments: newDepartments, healthMetrics: newHealthMetrics, orgChart: data.orgChart });
     toast({ title: "Başarılı!", description: "Veriler Excel'den başarıyla içe aktarıldı." });
   };
 

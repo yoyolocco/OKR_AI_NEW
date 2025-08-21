@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Target, Users, Award, Rocket, Hourglass, Crown, Star } from 'lucide-react';
+import { TrendingUp, Target, Users, Award, Rocket, Hourglass, Crown, Star, HeartPulse } from 'lucide-react';
 import { AppContext } from '@/context/AppContext';
 
 const Dashboard = () => {
   console.log("Dashboard component rendered"); // Added for debugging
   const { data } = useContext(AppContext);
-  const { objectives, departments } = data;
+  const { objectives, departments, healthMetrics } = data;
 
   const totalCompanyObjectives = objectives.length;
   const totalDepartmentObjectives = departments.reduce((sum, dept) => sum + (dept.objectives?.length || 0), 0);
@@ -26,7 +26,7 @@ const Dashboard = () => {
     { id: 1, label: 'Genel İlerleme', value: `${overallCompanyProgress}%`, Icon: TrendingUp },
     { id: 2, label: 'Aktif Hedefler', value: totalActiveObjectives, Icon: Target },
     { id: 3, label: 'Departman Sayısı', value: departmentCount, Icon: Users },
-    { id: 4, label: 'Başarı Oranı', value: `${overallCompanyProgress}%`, Icon: Award },
+    { id: 4, label: 'Sağlık Metrikleri', value: healthMetrics.length, Icon: HeartPulse },
   ];
 
   // Calculate current quarter/month for Hourglass
@@ -89,6 +89,31 @@ const Dashboard = () => {
             </motion.div>
         ))}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="glassmorphism rounded-xl p-6"
+      >
+        <h2 className="text-xl font-bold text-white mb-6">Sağlık Metrikleri</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(healthMetrics || []).map((metric) => (
+            <div key={metric.id} className="bg-slate-800/50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-400">{metric.title}</span>
+                </div>
+                <span className="font-semibold text-brand-cyan-light">{metric.progress || 0}%</span>
+              </div>
+              <div className="text-xs text-gray-400">Sorumlu: {metric.responsible}</div>
+            </div>
+          ))}
+          {(healthMetrics || []).length === 0 && (
+            <p className="text-gray-400 col-span-full text-center">Sağlık metriği bulunmuyor.</p>
+          )}
+        </div>
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

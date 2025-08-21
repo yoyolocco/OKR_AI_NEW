@@ -10,6 +10,7 @@ import CheckIn from '@/pages/CheckIn';
 import OrgChart from '@/pages/OrgChart';
 import AdminPanel from '@/pages/AdminPanel';
 import ExcelUpload from '@/pages/ExcelUpload';
+import HealthMetrics from '@/pages/HealthMetrics';
 import AIAnalysis from '@/pages/AIAnalysis';
 import Login from '@/pages/Login';
 import { AppContextProvider } from '@/context/AppContext';
@@ -50,6 +51,7 @@ function App() {
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/company-okrs" element={<CompanyOKRs />} />
                       <Route path="/department-okrs" element={<DepartmentOKRs />} />
+                      <Route path="/health-metrics" element={<HealthMetrics />} />
                       <Route path="/check-in" element={<CheckIn />} />
                       <Route path="/org-chart" element={<OrgChart />} />
                       <Route path="/admin" element={<AdminPanel />} />

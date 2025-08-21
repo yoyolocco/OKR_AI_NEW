@@ -14,7 +14,8 @@ import {
   Save,
   Download,
   Users,
-  Trash2
+  Trash2,
+  HeartPulse
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { AppContext } from '@/context/AppContext';
@@ -47,6 +48,7 @@ const Sidebar = ({ isOpen }) => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: Target, label: 'Şirket OKR\'ları', path: '/company-okrs' },
     { icon: Building2, label: 'Departman OKR\'ları', path: '/department-okrs' },
+    { icon: HeartPulse, label: 'Sağlık Metrikleri', path: '/health-metrics' },
     { icon: CheckCircle, label: 'Check-in & Raporlar', path: '/check-in' },
     { icon: Users, label: 'Organizasyon Şeması', path: '/org-chart' },
     { icon: Shield, label: 'Yönetici Paneli', path: '/admin' },
